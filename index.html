@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Predicción de Matrícula — UMSNH</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body>
+
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div class="brand">
+        <div class="brand-mark">Σ</div>
+        <div class="brand-text">
+          <div class="kicker">Series temporales · 5 modelos en competencia</div>
+          <h1>Predicción de Matrícula Universitaria</h1>
+          <p class="dek">Sistema interactivo para proyectar el ingreso, reingreso y matrícula total a 5 años en las licenciaturas de la UMSNH. Evalúa cinco modelos en paralelo y elige automáticamente el de menor error.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Panel de controles -->
+    <section class="controls" aria-label="Controles">
+      <div class="control">
+        <label for="sel-serie">Indicador</label>
+        <select id="sel-serie">
+          <option value="NVO_INGRESO">Nuevo Ingreso</option>
+          <option value="REINGRESO">Reingreso</option>
+          <option value="MATRICULA">Matrícula total</option>
+        </select>
+      </div>
+
+      <div class="control control-wide">
+        <label for="sel-carrera">Licenciatura</label>
+        <select id="sel-carrera"></select>
+      </div>
+
+      <div class="control">
+        <label for="sel-modelo">Modelo</label>
+        <select id="sel-modelo">
+          <option value="__mejor__">Mejor automático ★</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Cards de resumen -->
+    <section class="summary" aria-label="Resumen">
+      <article class="card card-winner">
+        <div class="card-label">Modelo ganador</div>
+        <div class="card-value" id="summary-mejor">—</div>
+        <div class="card-foot" id="summary-criterio">—</div>
+      </article>
+      <article class="card">
+        <div class="card-label">Años con datos</div>
+        <div class="card-value" id="summary-anios">—</div>
+        <div class="card-foot" id="summary-rango">—</div>
+      </article>
+      <article class="card">
+        <div class="card-label">Próximo año</div>
+        <div class="card-value" id="summary-prox">—</div>
+        <div class="card-foot" id="summary-prox-label">—</div>
+      </article>
+      <article class="card">
+        <div class="card-label">Δ a 5 años</div>
+        <div class="card-value" id="summary-delta">—</div>
+        <div class="card-foot" id="summary-delta-label">vs. último observado</div>
+      </article>
+    </section>
+
+    <!-- Gráfico interactivo -->
+    <section class="chart-wrap" aria-label="Gráfico">
+      <div class="section-header">
+        <h2>Evolución histórica y proyección</h2>
+        <div class="legend-hint">Punto sólido = histórico · línea punteada = pronóstico · estrella = modelo ganador</div>
+      </div>
+      <div id="grafico"></div>
+    </section>
+
+    <!-- Tablas -->
+    <section class="tables">
+      <div class="table-block">
+        <div class="section-header">
+          <h2>Ranking de modelos</h2>
+          <div class="legend-hint" id="ranking-criterio">Ordenados por RMSE</div>
+        </div>
+        <div class="table-scroll">
+          <table id="tabla-ranking">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Modelo</th>
+                <th class="num">RMSE</th>
+                <th>Detalle</th>
+                <th class="num">Pronóstico (5 años)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <div class="section-header">
+          <h2>Predicciones a 5 años</h2>
+          <div class="legend-hint" id="pred-modelo">—</div>
+        </div>
+        <div class="table-scroll">
+          <table id="tabla-predicciones">
+            <thead>
+              <tr>
+                <th>Año</th>
+                <th class="num">Valor estimado</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <button id="btn-descargar" class="btn">Descargar CSV</button>
+      </div>
+    </section>
+
+    <!-- Metodología -->
+    <section class="metodologia">
+      <h2>Metodología</h2>
+      <div class="metodo-grid">
+        <div>
+          <h3>Preprocesamiento</h3>
+          <p>De cada ciclo (<code>YY/YY SS</code> u <code>YY/YY SA</code>) se extrae el año y se agregan ambos periodos (SS = agosto, SA = enero) para obtener el ingreso anual por programa. Se descartan los programas sin datos válidos en la serie objetivo.</p>
+        </div>
+        <div>
+          <h3>Modelos evaluados</h3>
+          <ul class="metodo-list">
+            <li><strong>Regresión Lineal</strong> — tendencia lineal del tiempo.</li>
+            <li><strong>Exponencial</strong> — ajuste sobre <code>log(y)</code>.</li>
+            <li><strong>ARIMA(p,d,q)</strong> — grid search con <code>p,q ∈ {0..3}</code>, <code>d ∈ {0,1,2}</code>; elegido por menor <strong>AIC</strong>.</li>
+            <li><strong>Holt</strong> — suavizado exponencial doble (con y sin amortiguamiento).</li>
+            <li><strong>Media Móvil (3)</strong> — promedio de los últimos 3 años.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Criterio de selección</h3>
+          <p>Si la serie tiene <strong>al menos 8 años</strong>, se reservan los últimos 3 como conjunto de prueba y el modelo ganador es el de <strong>menor RMSE en test</strong>. En series más cortas se usa <strong>RMSE in-sample</strong> sobre toda la serie.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div>
+        Predicciones precomputadas con los mismos criterios del notebook
+        <code>Predicciones_Matricula_colab.ipynb</code>. La página es estática:
+        funciona sin servidor en GitHub Pages.
+      </div>
+      <div id="meta-version">—</div>
+    </footer>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
