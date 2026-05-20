@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Predicción de Matrícula · UMSNH</title>
+<meta name="description" content="Pronóstico de matrícula universitaria a 5 años por licenciatura, con cinco modelos de series temporales." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+
+<style>
+:root {
+  --bg:        #F4F0E6;
+  --bg-card:   #FBF8F1;
+  --ink:      #1A1612;
+  --ink-soft: #59524A;
+  --ink-mute: #8B847B;
+  --line:     #DDD4C0;
+  --line-strong: #B8AE99;
+  --wine:     #8B2635;
+  --wine-soft:#C25060;
+  --gold:     #B8893A;
+  --teal:     #2B6E6A;
+  --moss:     #5A6B3A;
+  --slate:    #4A5871;
+  --rust:     #A85432;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+::selection { background: var(--wine); color: var(--bg); }
+
+/* ---------- Layout ---------- */
+.shell {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 32px 28px 80px;
+}
+@media (max-width: 720px) {
+  .shell { padding: 20px 18px 60px; }
+}
+
+/* ---------- Header ---------- */
+.masthead {
+  border-bottom: 1px solid var(--line-strong);
+  padding-bottom: 24px;
+  margin-bottom: 36px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: end;
+}
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wine);
+  margin-bottom: 14px;
+}
+.title {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: clamp(38px, 5.5vw, 64px);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
+}
+.title em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--wine);
+  font-variation-settings: "opsz" 144, "SOFT" 100;
+}
+.kicker {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 17px;
+  max-width: 38ch;
+  margin-top: 12px;
+}
+.meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-mute);
+  text-align: right;
+  letter-spacing: 0.04em;
+}
+.meta .dot { color: var(--wine); }
+@media (max-width: 720px) {
+  .masthead { grid-template-columns: 1fr; }
+  .meta { text-align: left; }
+}
+
+/* ---------- Stats strip ---------- */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 40px;
+}
+.stat {
+  padding: 18px 20px;
+  border-right: 1px solid var(--line);
+}
+.stat:last-child { border-right: none; }
+.stat .label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-mute);
+  margin-bottom: 6px;
+}
+.stat .value {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.stat .value small {
+  font-size: 14px;
+  color: var(--ink-mute);
+  font-weight: 400;
+  margin-left: 4px;
+}
+@media (max-width: 720px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stat { border-bottom: 1px solid var(--line); }
+  .stat:nth-child(2) { border-right: none; }
+}
+
+/* ---------- Controls ---------- */
+.controls {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+@media (max-width: 900px) {
+  .controls { grid-template-columns: 1fr 1fr; }
+}
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.field select, .field input[type=number] {
+  font-family: 'Inter Tight', sans-serif;
+  font-size: 15px;
+  padding: 11px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%231A1612' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+}
+.field input[type=number] {
+  background-image: none;
+  padding-right: 14px;
+}
+.field select:hover, .field input:hover {
+  border-color: var(--wine);
+}
+.field select:focus, .field input:focus {
+  outline: none;
+  border-color: var(--wine);
+  background: var(--bg);
+}
+
+/* ---------- Winner panel ---------- */
+.winner {
+  background: var(--ink);
+  color: var(--bg);
+  padding: 30px 32px;
+  margin-bottom: 4px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 32px;
+  align-items: center;
+  border-radius: 2px;
+}
+.winner .crown {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  border-right: 1px solid #3a342c;
+  padding-right: 16px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.winner .body h2 {
+  font-family: 'Fraunces', serif;
+  font-weight: 400;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-mute);
+  margin-bottom: 8px;
+  letter-spacing: 0.01em;
+}
+.winner .body .name {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variation-settings: "opsz" 144, "SOFT" 80;
+}
+.winner .body .name em {
+  font-style: italic;
+  color: var(--gold);
+  font-weight: 400;
+}
+.winner .body .why {
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-style: italic;
+  color: var(--ink-mute);
+  margin-top: 10px;
+}
+.winner .forecast {
+  text-align: right;
+  border-left: 1px solid #3a342c;
+  padding-left: 32px;
+}
+.winner .forecast .lab {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 6px;
+}
+.winner .forecast .num {
+  font-family: 'Fraunces', serif;
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: var(--gold);
+}
+.winner .forecast .year {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink-mute);
+  margin-top: 6px;
+}
+@media (max-width: 900px) {
+  .winner { grid-template-columns: 1fr; gap: 18px; padding: 24px; }
+  .winner .crown { writing-mode: horizontal-tb; transform: none; border-right: none; border-bottom: 1px solid #3a342c; padding: 0 0 12px; }
+  .winner .body .name { font-size: 32px; }
+  .winner .forecast { border-left: none; border-top: 1px solid #3a342c; padding: 18px 0 0; text-align: left; }
+  .winner .forecast .num { font-size: 44px; }
+}
+
+/* ---------- Chart ---------- */
+.chart-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-top: none;
+  padding: 18px 18px 8px;
+  margin-bottom: 28px;
+  border-radius: 0 0 2px 2px;
+}
+#chart { width: 100%; height: 460px; }
+@media (max-width: 720px) { #chart { height: 380px; } }
+
+/* ---------- Models table ---------- */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 36px 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.section-head h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 500;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.section-head .note {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+
+table.models {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+table.models thead th {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line-strong);
+}
+table.models tbody td {
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+table.models tbody tr:hover { background: var(--bg-card); }
+table.models .swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+table.models .model-name {
+  font-family: 'Fraunces', serif;
+  font-size: 16px;
+  font-weight: 500;
+}
+table.models .rmse {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+}
+table.models .forecast-cells {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+table.models .best-row {
+  background: linear-gradient(to right, rgba(184, 137, 58, 0.08), transparent 70%);
+}
+table.models .best-row .model-name::before {
+  content: '★';
+  color: var(--gold);
+  margin-right: 6px;
+}
+.use-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  transition: all 0.15s;
+  border-radius: 2px;
+}
+.use-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+.use-btn.active {
+  background: var(--wine);
+  color: var(--bg);
+  border-color: var(--wine);
+}
+
+/* ---------- Loading state ---------- */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--ink-soft);
+}
+.loading::after {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--wine);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Footer ---------- */
+.footnotes {
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line-strong);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.65;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+.footnotes h4 {
+  font-family: 'JetBrains Mono', monospace;
+  font-style: normal;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 8px;
+}
+.footnotes p { margin-bottom: 10px; }
+@media (max-width: 720px) { .footnotes { grid-template-columns: 1fr; gap: 22px; } }
+
+/* ---------- Banner cuando hay error ---------- */
+.alert {
+  background: #F5EBE0;
+  border-left: 3px solid var(--rust);
+  padding: 14px 18px;
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-bottom: 24px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="shell" id="app">
+  <div class="loading">Cargando datos de matrícula</div>
+</div>
+
+<template id="page-template">
+  <header class="masthead">
+    <div>
+      <div class="eyebrow">Universidad Michoacana · Análisis predictivo</div>
+      <h1 class="title">Predicción de <em>matrícula</em><br>a cinco años</h1>
+      <p class="kicker">Compara cinco modelos de series temporales por carrera y descubre cuál predice mejor.</p>
+    </div>
+    <div class="meta">
+      <div><span class="dot">●</span> Datos hasta <span id="meta-ultimo"></span></div>
+      <div>Generado <span id="meta-gen"></span></div>
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><div class="label">Carreras</div><div class="value" id="st-carreras">—</div></div>
+    <div class="stat"><div class="label">Años de historia</div><div class="value" id="st-anios">—</div></div>
+    <div class="stat"><div class="label">Modelos evaluados</div><div class="value">5</div></div>
+    <div class="stat"><div class="label">Horizonte</div><div class="value" id="st-horizonte">5<small>años</small></div></div>
+  </section>
+
+  <div class="controls">
+    <div class="field">
+      <label for="sel-carrera">Carrera</label>
+      <select id="sel-carrera"></select>
+    </div>
+    <div class="field">
+      <label for="sel-indicador">Indicador</label>
+      <select id="sel-indicador">
+        <option value="NVO_INGRESO">Nuevo Ingreso</option>
+        <option value="ASPIRANTES">Aspirantes</option>
+        <option value="ACEPTADOS_PROG">Aceptados</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="sel-modelo">Modelo destacado</label>
+      <select id="sel-modelo">
+        <option value="auto">Mejor automático</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="sel-horizonte">Horizonte (años)</label>
+      <input type="number" id="sel-horizonte" min="1" max="10" value="5" />
+    </div>
+  </div>
+
+  <div id="winner-panel"></div>
+  <div class="chart-wrap"><div id="chart"></div></div>
+
+  <div class="section-head">
+    <h3>Comparativa de modelos</h3>
+    <span class="note">Click en un modelo para destacarlo en la gráfica</span>
+  </div>
+  <div id="models-table"></div>
+
+  <footer class="footnotes">
+    <div>
+      <h4>Sobre los modelos</h4>
+      <p><strong>Regresión Lineal</strong> ajusta una recta. <strong>Exponencial</strong> ajusta una curva exponencial vía logaritmos. <strong>Holt</strong> es suavizamiento exponencial con tendencia (clásico y amortiguado con φ=0.95). <strong>ARIMA</strong> autoregresivo integrado, grid search sobre p y d. <strong>Media Móvil</strong> usa la media de los últimos 3 años.</p>
+    </div>
+    <div>
+      <h4>Criterio de selección</h4>
+      <p>Si la serie tiene 8 años o más, los últimos 3 se reservan como conjunto de prueba y el ganador se elige por menor <em>RMSE</em> en test. Si la serie es más corta, RMSE in-sample. Los pronósticos se acotan a valores no negativos.</p>
+    </div>
+    <div>
+      <h4>Sobre los ciclos SS / SA</h4>
+      <p>Las carreras con dos ingresos al año (SS = agosto, SA = enero) tienen sus dos ciclos sumados como ingreso anual total. Aspirantes se toma como máximo entre URES para no inflar por duplicación.</p>
+    </div>
+  </footer>
+</template>
+
+<script>
+// ====================================================================
+// MODELOS DE PRONÓSTICO (puerto JS del notebook)
+// ====================================================================
+
+const COLORES = {
+  'Regresión Lineal': '#4A5871',
+  'Exponencial':      '#8B2635',
+  'Holt':             '#5A6B3A',
+  'Holt amortiguado': '#2B6E6A',
+  'Media Móvil (3)':  '#A85432',
+};
+const COLOR_ARIMA = '#B8893A';
+
+function rmse(a, b) {
+  let s = 0;
+  for (let i = 0; i < a.length; i++) s += (a[i] - b[i]) ** 2;
+  return Math.sqrt(s / a.length);
+}
+
+// ---------- Regresión Lineal (mínimos cuadrados) ----------
+function ajustarLineal(y) {
+  const n = y.length;
+  const x = Array.from({length: n}, (_, i) => i);
+  const mx = x.reduce((a,b) => a+b, 0) / n;
+  const my = y.reduce((a,b) => a+b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (x[i] - mx) * (y[i] - my);
+    den += (x[i] - mx) ** 2;
+  }
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = my - slope * mx;
+  return { predict: (i) => intercept + slope * i };
+}
+
+// ---------- Exponencial (regresión lineal sobre log y) ----------
+function ajustarExponencial(y) {
+  if (y.some(v => v <= 0)) return null;
+  const logY = y.map(Math.log);
+  const lin = ajustarLineal(logY);
+  return { predict: (i) => Math.exp(lin.predict(i)) };
+}
+
+// ---------- Holt (suavizamiento exponencial doble) ----------
+function holtFit(y, alpha, beta, damped, phi) {
+  const n = y.length;
+  if (n < 2) return null;
+  const L = new Array(n), b = new Array(n), fit = new Array(n);
+  L[0] = y[0];
+  b[0] = y[1] - y[0];
+  fit[0] = L[0];
+  for (let t = 1; t < n; t++) {
+    const trend = damped ? phi * b[t-1] : b[t-1];
+    L[t] = alpha * y[t] + (1 - alpha) * (L[t-1] + trend);
+    b[t] = beta * (L[t] - L[t-1]) + (1 - beta) * trend;
+    fit[t] = L[t-1] + trend;
+  }
+  return { L: L[n-1], b: b[n-1], fit, phi };
+}
+
+function holtForecast(state, h, damped) {
+  const out = new Array(h);
+  for (let k = 1; k <= h; k++) {
+    if (damped) {
+      let sumPhi = 0;
+      for (let j = 1; j <= k; j++) sumPhi += Math.pow(state.phi, j);
+      out[k-1] = state.L + sumPhi * state.b;
+    } else {
+      out[k-1] = state.L + k * state.b;
+    }
+  }
+  return out;
+}
+
+function ajustarHolt(y, damped) {
+  const phi = damped ? 0.95 : 1.0;
+  // Grid search sobre alpha y beta
+  let mejor = null, mejorRMSE = Infinity;
+  for (let a = 0.1; a <= 0.95; a += 0.1) {
+    for (let b = 0.05; b <= 0.5; b += 0.05) {
+      const state = holtFit(y, a, b, damped, phi);
+      if (!state) continue;
+      const err = rmse(y, state.fit);
+      if (err < mejorRMSE && isFinite(err)) {
+        mejorRMSE = err;
+        mejor = { state, alpha: a, beta: b };
+      }
+    }
+  }
+  if (!mejor) return null;
+  return {
+    fit: mejor.state.fit,
+    forecast: (h) => holtForecast(mejor.state, h, damped)
+  };
+}
+
+// ---------- Media móvil simple ----------
+function ajustarMediaMovil(y, w = 3) {
+  if (y.length <= w) return null;
+  const fit = new Array(y.length);
+  for (let i = 0; i < y.length; i++) {
+    const start = Math.max(0, i - w + 1);
+    let s = 0;
+    for (let j = start; j <= i; j++) s += y[j];
+    fit[i] = s / (i - start + 1);
+  }
+  const ultimo = fit[fit.length - 1];
+  return {
+    fit,
+    forecast: (h) => Array(h).fill(ultimo)
+  };
+}
+
+// ---------- ARIMA(p,d,0) simplificado: diferenciar + AR vía OLS ----------
+function diferenciar(y, d) {
+  let s = y.slice();
+  for (let k = 0; k < d; k++) {
+    const nuevo = new Array(s.length - 1);
+    for (let i = 1; i < s.length; i++) nuevo[i-1] = s[i] - s[i-1];
+    s = nuevo;
+  }
+  return s;
+}
+
+function integrar(diffs, ultimosNiveles, d) {
+  // ultimosNiveles: últimos d valores de la serie antes de diferenciar
+  let serie = diffs.slice();
+  for (let k = d - 1; k >= 0; k--) {
+    const nivel0 = ultimosNiveles[k];
+    const acum = new Array(serie.length);
+    let prev = nivel0;
+    for (let i = 0; i < serie.length; i++) {
+      acum[i] = prev + serie[i];
+      prev = acum[i];
+    }
+    serie = acum;
+  }
+  return serie;
+}
+
+// OLS: y = X β + ε
+function olsBeta(X, yv) {
+  const n = X.length, k = X[0].length;
+  // Calcula X'X y X'y
+  const XtX = Array.from({length: k}, () => new Array(k).fill(0));
+  const Xty = new Array(k).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let a = 0; a < k; a++) {
+      Xty[a] += X[i][a] * yv[i];
+      for (let b = 0; b < k; b++) XtX[a][b] += X[i][a] * X[i][b];
+    }
+  }
+  // Invertir XtX por Gauss-Jordan (k pequeño, k≤4)
+  const aug = XtX.map((row, i) => [...row, ...Array(k).fill(0).map((_,j) => i===j ? 1 : 0)]);
+  for (let i = 0; i < k; i++) {
+    let piv = aug[i][i];
+    if (Math.abs(piv) < 1e-12) {
+      // pivoteo
+      let swap = -1;
+      for (let r = i+1; r < k; r++) if (Math.abs(aug[r][i]) > 1e-12) { swap = r; break; }
+      if (swap < 0) return null;
+      [aug[i], aug[swap]] = [aug[swap], aug[i]];
+      piv = aug[i][i];
+    }
+    for (let c = 0; c < 2*k; c++) aug[i][c] /= piv;
+    for (let r = 0; r < k; r++) {
+      if (r === i) continue;
+      const f = aug[r][i];
+      for (let c = 0; c < 2*k; c++) aug[r][c] -= f * aug[i][c];
+    }
+  }
+  const inv = aug.map(row => row.slice(k));
+  const beta = new Array(k).fill(0);
+  for (let i = 0; i < k; i++) for (let j = 0; j < k; j++) beta[i] += inv[i][j] * Xty[j];
+  return beta;
+}
+
+function ajustarAR(serieDiff, p) {
+  // y_t = c + φ1 y_{t-1} + ... + φp y_{t-p} + ε
+  if (serieDiff.length <= p + 1) return null;
+  const yv = [], X = [];
+  for (let t = p; t < serieDiff.length; t++) {
+    const row = [1];
+    for (let k = 1; k <= p; k++) row.push(serieDiff[t-k]);
+    X.push(row);
+    yv.push(serieDiff[t]);
+  }
+  const beta = olsBeta(X, yv);
+  if (!beta) return null;
+  // Residuales para varianza
+  let sse = 0;
+  for (let i = 0; i < X.length; i++) {
+    let yhat = 0;
+    for (let j = 0; j < beta.length; j++) yhat += X[i][j] * beta[j];
+    sse += (yv[i] - yhat) ** 2;
+  }
+  const k = beta.length;
+  const n = X.length;
+  // AIC = n*log(SSE/n) + 2k
+  const sigma2 = sse / n;
+  if (sigma2 <= 0) return null;
+  const aic = n * Math.log(sigma2) + 2 * k;
+  return { beta, aic, p, n, sigma2 };
+}
+
+function predecirAR(serieDiff, modelo, h) {
+  const p = modelo.p, beta = modelo.beta;
+  const futuros = new Array(h);
+  const ventana = serieDiff.slice(-p);
+  for (let i = 0; i < h; i++) {
+    let yhat = beta[0];
+    for (let k = 1; k <= p; k++) yhat += beta[k] * ventana[p-k];
+    futuros[i] = yhat;
+    ventana.shift();
+    ventana.push(yhat);
+  }
+  return futuros;
+}
+
+function ajustarARIMA(y, horizonte) {
+  let mejorAIC = Infinity, mejor = null, mejorOrden = null;
+  for (let d = 0; d <= 2; d++) {
+    if (y.length <= d + 2) continue;
+    const serieDiff = diferenciar(y, d);
+    for (let p = 1; p <= 3; p++) {
+      const mod = ajustarAR(serieDiff, p);
+      if (!mod) continue;
+      if (mod.aic < mejorAIC && isFinite(mod.aic)) {
+        mejorAIC = mod.aic;
+        mejor = mod;
+        mejorOrden = { p, d };
+      }
+    }
+  }
+  if (!mejor) return null;
+
+  const d = mejorOrden.d;
+  const p = mejorOrden.p;
+  const serieDiff = diferenciar(y, d);
+
+  // Ajuste in-sample reconstruido en la escala original
+  const yhatDiff = new Array(serieDiff.length).fill(NaN);
+  for (let t = p; t < serieDiff.length; t++) {
+    let yh = mejor.beta[0];
+    for (let k = 1; k <= p; k++) yh += mejor.beta[k] * serieDiff[t-k];
+    yhatDiff[t] = yh;
+  }
+  // Integrar yhatDiff a la escala original
+  // Comenzamos los primeros (p) puntos como NaN -> ponemos el observado
+  for (let i = 0; i < p; i++) yhatDiff[i] = serieDiff[i];
+
+  let fitOriginal = yhatDiff.slice();
+  for (let k = d - 1; k >= 0; k--) {
+    const acum = new Array(fitOriginal.length + 1);
+    acum[0] = (k === 0) ? y[0] : diferenciar(y, k)[0];
+    for (let i = 0; i < fitOriginal.length; i++) acum[i+1] = acum[i] + fitOriginal[i];
+    fitOriginal = acum.slice(1);
+  }
+
+  // En la escala original, ajuste y observado deben tener la misma longitud
+  // El fit pierde los primeros (p) puntos de la serie diferenciada, que son d+p en la original.
+  // Llenamos los primeros con el observado para no perder muestra al graficar.
+  while (fitOriginal.length < y.length) fitOriginal.unshift(y[0]);
+  if (fitOriginal.length > y.length) fitOriginal = fitOriginal.slice(0, y.length);
+  for (let i = 0; i < p + d; i++) fitOriginal[i] = y[i];
+
+  // Pronóstico
+  const futDiff = predecirAR(serieDiff, mejor, horizonte);
+  const ultimosNiveles = [];
+  let s = y.slice();
+  for (let k = 0; k < d; k++) {
+    ultimosNiveles.push(s[s.length-1]);
+    s = diferenciar(s, 1);
+  }
+  let futOriginal = futDiff.slice();
+  for (let k = d - 1; k >= 0; k--) {
+    const acum = new Array(futOriginal.length);
+    let prev = ultimosNiveles[k];
+    for (let i = 0; i < futOriginal.length; i++) {
+      acum[i] = prev + futOriginal[i];
+      prev = acum[i];
+    }
+    futOriginal = acum;
+  }
+
+  return {
+    nombre: `ARIMA(${p},${d},0)`,
+    fit: fitOriginal,
+    forecast: futOriginal,
+    info: `AIC=${mejor.aic.toFixed(1)}`,
+    orden: mejorOrden,
+  };
+}
+
+// ---------- Pipeline principal ----------
+function evaluar(y, horizonte) {
+  const y_arr = y.map(Number);
+  const n = y_arr.length;
+  const usar_test = n >= 8;
+  const test_size = 3;
+  const y_train = usar_test ? y_arr.slice(0, n - test_size) : y_arr;
+  const y_test = usar_test ? y_arr.slice(n - test_size) : null;
+  const resultados = {};
+
+  // 1) Regresión Lineal
+  try {
+    const m = ajustarLineal(y_train);
+    const fit = Array.from({length: n}, (_, i) => Math.max(0, m.predict(i)));
+    const fut = Array.from({length: horizonte}, (_, i) => Math.max(0, m.predict(n + i)));
+    const err = usar_test ? rmse(y_test, fit.slice(n - test_size)) : rmse(y_arr, fit);
+    if (isFinite(err)) resultados['Regresión Lineal'] = { rmse: err, ajuste: fit, prediccion: fut, info: '' };
+  } catch(e){}
+
+  // 2) Exponencial
+  try {
+    const m = ajustarExponencial(y_train);
+    if (m) {
+      const fit = Array.from({length: n}, (_, i) => Math.max(0, m.predict(i)));
+      const fut = Array.from({length: horizonte}, (_, i) => Math.max(0, m.predict(n + i)));
+      const err = usar_test ? rmse(y_test, fit.slice(n - test_size)) : rmse(y_arr, fit);
+      if (isFinite(err)) resultados['Exponencial'] = { rmse: err, ajuste: fit, prediccion: fut, info: '' };
+    }
+  } catch(e){}
+
+  // 3) ARIMA
+  try {
+    const m = ajustarARIMA(y_train, horizonte);
+    if (m) {
+      // Re-pronosticar usando toda la serie para los años futuros
+      const mFull = ajustarARIMA(y_arr, horizonte);
+      const fit = m.fit.map(v => Math.max(0, v));
+      const fut = (mFull ? mFull.forecast : m.forecast).map(v => Math.max(0, v));
+      // Para validación: rmse en test viene del modelo entrenado en y_train
+      let err;
+      if (usar_test) {
+        // pronóstico desde y_train hasta los siguientes test_size pasos
+        const futTest = m.forecast.slice(0, test_size).map(v => Math.max(0, v));
+        err = rmse(y_test, futTest);
+      } else {
+        err = rmse(y_arr, fit);
+      }
+      if (isFinite(err)) resultados[m.nombre] = { rmse: err, ajuste: fit, prediccion: fut, info: m.info };
+    }
+  } catch(e){}
+
+  // 4) Holt clásico y amortiguado
+  for (const [nombre, damped] of [['Holt', false], ['Holt amortiguado', true]]) {
+    try {
+      const m = ajustarHolt(y_train, damped);
+      if (m) {
+        const fitTrain = m.fit.map(v => Math.max(0, v));
+        let err, fitFull, fut;
+        if (usar_test) {
+          const fcTest = m.forecast(test_size).map(v => Math.max(0, v));
+          fitFull = [...fitTrain, ...fcTest];
+          err = rmse(y_test, fcTest);
+          const mFull = ajustarHolt(y_arr, damped);
+          fut = mFull ? mFull.forecast(horizonte).map(v => Math.max(0, v))
+                      : m.forecast(horizonte).map(v => Math.max(0, v));
+        } else {
+          fitFull = fitTrain;
+          err = rmse(y_arr, fitTrain);
+          fut = m.forecast(horizonte).map(v => Math.max(0, v));
+        }
+        if (isFinite(err)) resultados[nombre] = { rmse: err, ajuste: fitFull, prediccion: fut, info: '' };
+      }
+    } catch(e){}
+  }
+
+  // 5) Media Móvil — igual que el notebook: rolling sobre TODA la serie
+  try {
+    const m = ajustarMediaMovil(y_arr);
+    if (m) {
+      const fit = m.fit.map(v => Math.max(0, v));
+      const fut = m.forecast(horizonte).map(v => Math.max(0, v));
+      const err = usar_test ? rmse(y_test, fit.slice(n - test_size)) : rmse(y_arr, fit);
+      if (isFinite(err)) resultados['Media Móvil (3)'] = { rmse: err, ajuste: fit, prediccion: fut, info: '' };
+    }
+  } catch(e){}
+
+  if (Object.keys(resultados).length === 0) return null;
+  // Elegir el mejor
+  let mejor = null, mejorErr = Infinity;
+  for (const k of Object.keys(resultados)) {
+    if (resultados[k].rmse < mejorErr) { mejorErr = resultados[k].rmse; mejor = k; }
+  }
+  return { mejor, resultados, usar_test };
+}
+
+// ====================================================================
+// UI
+// ====================================================================
+
+let DATA = null;
+let STATE = { carrera: null, indicador: 'NVO_INGRESO', horizonte: 5, modeloUsuario: 'auto', ultimaEval: null };
+
+async function cargar() {
+  const r = await fetch('data.json');
+  DATA = await r.json();
+
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  app.appendChild(document.getElementById('page-template').content.cloneNode(true));
+
+  // Stats globales
+  const carreras = Object.keys(DATA.carreras).sort();
+  document.getElementById('st-carreras').textContent = carreras.length;
+  let anioMin = Infinity, anioMax = -Infinity;
+  for (const c of carreras) {
+    const arr = DATA.carreras[c].anios;
+    if (arr.length) { anioMin = Math.min(anioMin, arr[0]); anioMax = Math.max(anioMax, arr[arr.length - 1]); }
+  }
+  document.getElementById('st-anios').innerHTML = `${anioMax - anioMin + 1}<small>${anioMin}–${anioMax}</small>`;
+  document.getElementById('meta-ultimo').textContent = anioMax;
+  document.getElementById('meta-gen').textContent = DATA.generado || '—';
+
+  // Dropdown de carreras (default Médico Cirujano si existe)
+  const sel = document.getElementById('sel-carrera');
+  for (const c of carreras) {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  }
+  const def = carreras.find(c => /M[eé]dico Cirujano/i.test(c)) || carreras[0];
+  sel.value = def;
+  STATE.carrera = def;
+
+  // Eventos
+  sel.addEventListener('change', e => { STATE.carrera = e.target.value; STATE.modeloUsuario = 'auto'; render(); });
+  document.getElementById('sel-indicador').addEventListener('change', e => { STATE.indicador = e.target.value; STATE.modeloUsuario = 'auto'; render(); });
+  document.getElementById('sel-horizonte').addEventListener('change', e => {
+    const v = Math.max(1, Math.min(10, parseInt(e.target.value) || 5));
+    e.target.value = v;
+    STATE.horizonte = v;
+    document.getElementById('st-horizonte').innerHTML = `${v}<small>años</small>`;
+    render();
+  });
+  document.getElementById('sel-modelo').addEventListener('change', e => {
+    STATE.modeloUsuario = e.target.value;
+    render();
+  });
+
+  render();
+}
+
+function render() {
+  const carrera = DATA.carreras[STATE.carrera];
+  if (!carrera) return;
+  const y = carrera[STATE.indicador].slice();
+  const anios = carrera.anios.slice();
+
+  // Si hay ceros al inicio (carrera todavía no abierta), recortar
+  let inicio = 0;
+  while (inicio < y.length && y[inicio] === 0) inicio++;
+  const yClean = y.slice(inicio);
+  const aniosClean = anios.slice(inicio);
+
+  if (yClean.length < 3) {
+    document.getElementById('winner-panel').innerHTML = `
+      <div class="alert">Datos insuficientes para esta combinación: sólo ${yClean.length} año(s) con valores. Necesitamos al menos 3 para modelar.</div>`;
+    Plotly.purge('chart');
+    document.getElementById('models-table').innerHTML = '';
+    return;
+  }
+
+  const ev = evaluar(yClean, STATE.horizonte);
+  STATE.ultimaEval = ev;
+  if (!ev) {
+    document.getElementById('winner-panel').innerHTML = `<div class="alert">Ningún modelo pudo ajustarse a esta serie.</div>`;
+    Plotly.purge('chart');
+    return;
+  }
+
+  // Actualizar dropdown de modelos disponibles
+  const selMod = document.getElementById('sel-modelo');
+  const valorPrev = STATE.modeloUsuario;
+  selMod.innerHTML = '<option value="auto">Mejor automático</option>';
+  for (const k of Object.keys(ev.resultados)) {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = k;
+    selMod.appendChild(o);
+  }
+  selMod.value = (valorPrev === 'auto' || ev.resultados[valorPrev]) ? valorPrev : 'auto';
+
+  const modeloDestacado = (selMod.value === 'auto') ? ev.mejor : selMod.value;
+  const esElMejor = (modeloDestacado === ev.mejor);
+
+  const aniosFut = [];
+  for (let i = 1; i <= STATE.horizonte; i++) aniosFut.push(aniosClean[aniosClean.length - 1] + i);
+
+  // ---------- Winner panel ----------
+  const indicadorBonito = DATA.indicadores[STATE.indicador];
+  const pred = ev.resultados[modeloDestacado].prediccion;
+  const ultimoPron = Math.round(pred[pred.length - 1]);
+  const criterio = ev.usar_test ? 'menor RMSE en validación (test de 3 años)' : 'menor RMSE in-sample';
+  const auto = (selMod.value === 'auto');
+
+  const wp = document.getElementById('winner-panel');
+  wp.innerHTML = `
+    <div class="winner">
+      <div class="crown">${auto ? '★ Mejor modelo' : '· Modelo elegido'}</div>
+      <div class="body">
+        <h2>Para ${indicadorBonito} de <strong style="color:var(--bg);font-style:normal">${STATE.carrera}</strong>, el ${auto ? 'mejor' : 'modelo seleccionado'} es</h2>
+        <div class="name">${auto ? '<em>' + modeloDestacado + '</em>' : modeloDestacado}</div>
+        <div class="why">${auto
+          ? `Elegido por ${criterio}. RMSE = ${ev.resultados[modeloDestacado].rmse.toFixed(1)}.`
+          : `RMSE = ${ev.resultados[modeloDestacado].rmse.toFixed(1)}. ${esElMejor ? 'Coincide con el mejor automático.' : 'El mejor automático sería <em>' + ev.mejor + '</em>.'}`}</div>
+      </div>
+      <div class="forecast">
+        <div class="lab">Pronóstico ${aniosFut[aniosFut.length-1]}</div>
+        <div class="num">${ultimoPron.toLocaleString('es-MX')}</div>
+        <div class="year">vs. ${yClean[yClean.length-1].toLocaleString('es-MX')} en ${aniosClean[aniosClean.length-1]} (${pct(ultimoPron, yClean[yClean.length-1])})</div>
+      </div>
+    </div>`;
+
+  // ---------- Gráfica ----------
+  graficar(aniosClean, yClean, aniosFut, ev, modeloDestacado);
+
+  // ---------- Tabla de modelos ----------
+  tabla(ev, modeloDestacado, aniosFut);
+}
+
+function pct(nuevo, viejo) {
+  if (viejo === 0) return '';
+  const d = (nuevo - viejo) / viejo * 100;
+  const sig = d >= 0 ? '+' : '';
+  return `${sig}${d.toFixed(1)}%`;
+}
+
+function colorPara(nombre) {
+  if (nombre.startsWith('ARIMA')) return COLOR_ARIMA;
+  return COLORES[nombre] || '#888';
+}
+
+function graficar(anios, y, aniosFut, ev, destacado) {
+  const traces = [];
+
+  // Histórico
+  traces.push({
+    x: anios, y: y,
+    mode: 'lines+markers',
+    name: 'Histórico',
+    line: { color: '#1A1612', width: 2.5 },
+    marker: { color: '#1A1612', size: 7, line: { color: '#FBF8F1', width: 1.5 } },
+    hovertemplate: '<b>%{x}</b><br>%{y:,}<extra>Histórico</extra>',
+  });
+
+  // Conector: último histórico → primer pronóstico para cada modelo destacado
+  for (const [nombre, datos] of Object.entries(ev.resultados)) {
+    const esDestacado = (nombre === destacado);
+    const color = colorPara(nombre);
+    // Pronóstico futuro
+    traces.push({
+      x: [anios[anios.length - 1], ...aniosFut],
+      y: [y[y.length - 1], ...datos.prediccion],
+      mode: 'lines+markers',
+      name: `${nombre} (RMSE ${datos.rmse.toFixed(1)})`,
+      line: {
+        color,
+        width: esDestacado ? 3 : 1.3,
+        dash: esDestacado ? 'solid' : 'dot',
+      },
+      marker: {
+        color,
+        size: esDestacado ? 8 : 5,
+        symbol: esDestacado ? 'star' : 'circle',
+        line: { color: '#FBF8F1', width: 1 },
+      },
+      opacity: esDestacado ? 1.0 : 0.4,
+      hovertemplate: `<b>%{x}</b><br>%{y:,}<extra>${nombre}</extra>`,
+    });
+  }
+
+  const layout = {
+    paper_bgcolor: '#FBF8F1',
+    plot_bgcolor: '#FBF8F1',
+    font: { family: 'Inter Tight, sans-serif', size: 12, color: '#1A1612' },
+    margin: { l: 60, r: 30, t: 20, b: 50 },
+    xaxis: {
+      title: { text: 'Año', font: { size: 11, color: '#8B847B' } },
+      gridcolor: '#E8E0CD',
+      linecolor: '#B8AE99',
+      tickfont: { family: 'JetBrains Mono', size: 11 },
+      dtick: 1,
+    },
+    yaxis: {
+      title: { text: DATA.indicadores[STATE.indicador], font: { size: 11, color: '#8B847B' } },
+      gridcolor: '#E8E0CD',
+      linecolor: '#B8AE99',
+      tickfont: { family: 'JetBrains Mono', size: 11 },
+      rangemode: 'tozero',
+    },
+    legend: {
+      orientation: 'h',
+      y: -0.18,
+      x: 0,
+      font: { size: 11, family: 'Inter Tight' },
+      bgcolor: 'rgba(0,0,0,0)',
+    },
+    shapes: [{
+      // Línea vertical que separa histórico de pronóstico
+      type: 'line',
+      x0: anios[anios.length - 1], x1: anios[anios.length - 1],
+      y0: 0, y1: 1, yref: 'paper',
+      line: { color: '#B8AE99', width: 1, dash: 'dot' }
+    }],
+    annotations: [{
+      x: anios[anios.length - 1], y: 1, yref: 'paper',
+      text: '← histórico   pronóstico →',
+      showarrow: false,
+      yanchor: 'bottom',
+      font: { family: 'Fraunces', size: 11, color: '#8B847B', style: 'italic' },
+    }],
+    hoverlabel: {
+      bgcolor: '#1A1612', font: { color: '#F4F0E6', family: 'JetBrains Mono', size: 12 },
+      bordercolor: '#1A1612',
+    },
+  };
+
+  Plotly.newPlot('chart', traces, layout, {
+    displayModeBar: true,
+    displaylogo: false,
+    responsive: true,
+    modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+    toImageButtonOptions: {
+      filename: `prediccion_${STATE.carrera.replace(/[^a-z0-9]/gi, '_')}_${STATE.indicador}`,
+      format: 'png', height: 600, width: 1100, scale: 2
+    },
+  });
+}
+
+function tabla(ev, destacado, aniosFut) {
+  const modelos = Object.entries(ev.resultados).sort((a, b) => a[1].rmse - b[1].rmse);
+  let html = `
+    <table class="models">
+      <thead>
+        <tr>
+          <th>Modelo</th>
+          <th>RMSE</th>
+          <th>${aniosFut[0]}</th>
+          <th>${aniosFut[Math.floor(aniosFut.length/2)]}</th>
+          <th>${aniosFut[aniosFut.length - 1]}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>`;
+  for (const [nombre, datos] of modelos) {
+    const esMejor = (nombre === ev.mejor);
+    const esDestacado = (nombre === destacado);
+    const c = colorPara(nombre);
+    const f0 = datos.prediccion[0];
+    const fm = datos.prediccion[Math.floor(datos.prediccion.length/2)];
+    const fl = datos.prediccion[datos.prediccion.length - 1];
+    html += `
+      <tr class="${esMejor ? 'best-row' : ''}">
+        <td><span class="swatch" style="background:${c}"></span><span class="model-name">${nombre}</span></td>
+        <td class="rmse">${datos.rmse.toFixed(2)}${datos.info ? ' · ' + datos.info : ''}</td>
+        <td class="forecast-cells">${Math.round(f0).toLocaleString('es-MX')}</td>
+        <td class="forecast-cells">${Math.round(fm).toLocaleString('es-MX')}</td>
+        <td class="forecast-cells">${Math.round(fl).toLocaleString('es-MX')}</td>
+        <td><button class="use-btn ${esDestacado ? 'active' : ''}" data-modelo="${nombre}">${esDestacado ? 'Activo' : 'Usar'}</button></td>
+      </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('models-table').innerHTML = html;
+
+  // Bind buttons
+  document.querySelectorAll('.use-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = btn.dataset.modelo;
+      document.getElementById('sel-modelo').value = m;
+      STATE.modeloUsuario = m;
+      render();
+      document.getElementById('chart').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+}
+
+// Arrancar
+cargar().catch(err => {
+  document.getElementById('app').innerHTML =
+    `<div class="alert">No pude cargar <code>data.json</code>. Asegúrate de que el archivo esté en la misma carpeta y de servir la página por HTTP (no abriendo el HTML directamente). <br><br><small>${err.message}</small></div>`;
+});
+</script>
+</body>
+</html>
